@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"slices"
 
 	configutil "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -44,6 +45,7 @@ type TestSimplePrometheusEndToEndOpts struct {
 type MockConsumer struct {
 	T               *testing.T
 	ExpectedMetrics map[string]ExpectedMetricStruct
+	SpecialLabels 	[]string
 }
 
 func (m MockConsumer) Capabilities() consumer.Capabilities {
@@ -68,6 +70,11 @@ func (m MockConsumer) ConsumeMetrics(_ context.Context, md pmetric.Metrics) erro
 				labelValue, isFound := metric.Gauge().DataPoints().At(0).Attributes().Get(expectedLabel.LabelName)
 				assert.True(m.T, isFound)
 				assert.Equal(m.T, expectedLabel.LabelValue, labelValue.Str())
+			}
+			for _, specialLabel := range m.SpecialLabels {
+				isLabelInExpected := slices.ContainsFunc(metricsStruct.MetricLabels, func(label MetricLabel) bool { return label.LabelName == specialLabel })
+				_, isLabelInActual := metric.Gauge().DataPoints().At(0).Attributes().Get(specialLabel)
+				assert.Equal(m.T, isLabelInExpected, isLabelInActual)
 			}
 			metricFoundCount++
 		}
