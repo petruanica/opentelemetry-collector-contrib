@@ -34,7 +34,7 @@ func (m mockHostInfoProvider) GetInstanceType() string {
 	return dummyInstanceType
 }
 
-var specialLabels = []string{"UltraServer"}
+var additionalLabels = []string{"UltraServer"}
 
 const renameMetric = `
 # HELP python_gc_objects_collected_total Objects collected during gc
@@ -123,7 +123,7 @@ func TestNewNeuronScraperEndToEnd(t *testing.T) {
 	consumer := prometheusscraper.MockConsumer{
 		T:               t,
 		ExpectedMetrics: expectedMetrics,
-		SpecialLabels: specialLabels,
+		AdditionalLabels: additionalLabels,
 	}
 
 	mockedScraperOpts := prometheusscraper.SimplePrometheusScraperOpts{
@@ -238,7 +238,7 @@ func TestNewNeuronScraperWithUltraServersEndToEnd(t *testing.T) {
 	consumer := prometheusscraper.MockConsumer{
 		T:               t,
 		ExpectedMetrics: expectedMetrics,
-		SpecialLabels: specialLabels,
+		AdditionalLabels: additionalLabels,
 	}
 
 	mockedScraperOpts := prometheusscraper.SimplePrometheusScraperOpts{

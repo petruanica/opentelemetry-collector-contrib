@@ -45,7 +45,7 @@ type TestSimplePrometheusEndToEndOpts struct {
 type MockConsumer struct {
 	T               *testing.T
 	ExpectedMetrics map[string]ExpectedMetricStruct
-	SpecialLabels 	[]string
+	AdditionalLabels 	[]string
 }
 
 func (m MockConsumer) Capabilities() consumer.Capabilities {
@@ -71,7 +71,7 @@ func (m MockConsumer) ConsumeMetrics(_ context.Context, md pmetric.Metrics) erro
 				assert.True(m.T, isFound)
 				assert.Equal(m.T, expectedLabel.LabelValue, labelValue.Str())
 			}
-			for _, specialLabel := range m.SpecialLabels {
+			for _, specialLabel := range m.AdditionalLabels {
 				isLabelInExpected := slices.ContainsFunc(metricsStruct.MetricLabels, func(label MetricLabel) bool { return label.LabelName == specialLabel })
 				_, isLabelInActual := metric.Gauge().DataPoints().At(0).Attributes().Get(specialLabel)
 				assert.Equal(m.T, isLabelInExpected, isLabelInActual)
