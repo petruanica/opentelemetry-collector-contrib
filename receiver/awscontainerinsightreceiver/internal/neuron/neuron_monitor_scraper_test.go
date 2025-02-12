@@ -14,13 +14,14 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscontainerinsightreceiver/internal/prometheusscraper"
 )
 
-const dummyClusterName = "cluster-name"
-const dummyHostName = "i-000000000"
-const dummyNodeName = "dummy-nodeName"
-const dummyInstanceType = "instance-type"
+const (
+	dummyClusterName  = "cluster-name"
+	dummyHostName     = "i-000000000"
+	dummyNodeName     = "dummy-nodeName"
+	dummyInstanceType = "instance-type"
+)
 
-type mockHostInfoProvider struct {
-}
+type mockHostInfoProvider struct{}
 
 func (m mockHostInfoProvider) GetClusterName() string {
 	return dummyClusterName
@@ -105,7 +106,7 @@ func TestNewNeuronScraperEndToEnd(t *testing.T) {
 			{LabelName: "NodeName", LabelValue: dummyNodeName},
 		},
 	}
-	
+
 	expectedMetrics["hardware_ecc_events_total"] = prometheusscraper.ExpectedMetricStruct{
 		MetricValue: 864.0,
 		MetricLabels: []prometheusscraper.MetricLabel{
@@ -121,8 +122,8 @@ func TestNewNeuronScraperEndToEnd(t *testing.T) {
 	}
 
 	consumer := prometheusscraper.MockConsumer{
-		T:               t,
-		ExpectedMetrics: expectedMetrics,
+		T:                t,
+		ExpectedMetrics:  expectedMetrics,
 		AdditionalLabels: additionalLabels,
 	}
 
@@ -143,7 +144,6 @@ func TestNewNeuronScraperEndToEnd(t *testing.T) {
 		MetricRelabelConfig: GetNeuronMetricRelabelConfigs(mockHostInfoProvider{}),
 	})
 }
-
 
 const renameMetricWithUltraServers = `
 # HELP python_gc_objects_collected_total Objects collected during gc
@@ -236,8 +236,8 @@ func TestNewNeuronScraperWithUltraServersEndToEnd(t *testing.T) {
 	}
 
 	consumer := prometheusscraper.MockConsumer{
-		T:               t,
-		ExpectedMetrics: expectedMetrics,
+		T:                t,
+		ExpectedMetrics:  expectedMetrics,
 		AdditionalLabels: additionalLabels,
 	}
 

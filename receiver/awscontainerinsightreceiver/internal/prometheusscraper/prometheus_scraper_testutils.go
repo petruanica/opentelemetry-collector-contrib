@@ -6,9 +6,9 @@ package prometheusscraper // import "github.com/open-telemetry/opentelemetry-col
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
-	"slices"
 
 	configutil "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -43,9 +43,9 @@ type TestSimplePrometheusEndToEndOpts struct {
 }
 
 type MockConsumer struct {
-	T               *testing.T
-	ExpectedMetrics map[string]ExpectedMetricStruct
-	AdditionalLabels 	[]string
+	T                *testing.T
+	ExpectedMetrics  map[string]ExpectedMetricStruct
+	AdditionalLabels []string
 }
 
 func (m MockConsumer) Capabilities() consumer.Capabilities {
