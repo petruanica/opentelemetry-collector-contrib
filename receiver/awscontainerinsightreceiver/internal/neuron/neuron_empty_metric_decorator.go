@@ -116,15 +116,21 @@ func populateCoreMetrics(metrics pmetric.MetricSlice, metricName string, hardwar
 		return
 	}
 
+	metricToAdd := pmetric.NewMetric()
+	metricToAdd.SetEmptyGauge()
+	metricToAdd.SetName(metricName)
+	emptyDatapoints := metricToAdd.Gauge().DataPoints()
 	for coreIndex := 0; coreIndex < neuronCoresPerDevice*neuronDeviceCount; coreIndex++ {
-		metricToAdd := createNewMetricFromHardwareInfo(hardwareInfo, metricName)
-		metricBody := metricToAdd.Gauge().DataPoints().At(0)
-
-		metricBody.Attributes().PutStr(neuronCoreAttributeKey, strconv.Itoa(coreIndex))
-		metricBody.Attributes().PutStr(neuronDeviceAttributeKey, strconv.Itoa(coreIndex/neuronCoresPerDevice))
-		metricToAdd.CopyTo(metrics.AppendEmpty())
+		datapoint := emptyDatapoints.AppendEmpty()
+		hardwareInfo.Sum().DataPoints().At(0).CopyTo(datapoint)
+		datapoint.SetDoubleValue(0)
+		datapoint.Attributes().PutStr(neuronCoreAttributeKey, strconv.Itoa(coreIndex))
+		datapoint.Attributes().PutStr(neuronCoreOriginalAttributeKey, strconv.Itoa(coreIndex))
+		datapoint.Attributes().PutStr(neuronDeviceAttributeKey, strconv.Itoa(coreIndex/neuronCoresPerDevice))
+		datapoint.Attributes().PutStr("runtime_tag", "DEFAULT")
 	}
 
+	metricToAdd.CopyTo(metrics.AppendEmpty())
 }
 
 // returns the device count for neuron from the hardwareInfo metric
@@ -150,7 +156,7 @@ func createNewMetricFromHardwareInfo(hardwareInfo pmetric.Metric, metricName str
 	metricToAdd.SetName(metricName)
 	metricBody := metricToAdd.Gauge().DataPoints().At(0)
 	metricBody.SetDoubleValue(0)
-	metricBody.Attributes().PutStr("runtime_tag", "default")
+	metricBody.Attributes().PutStr("runtime_tag", "DEFAULT")
 
 	return metricToAdd
 }
