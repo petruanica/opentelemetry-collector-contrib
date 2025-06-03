@@ -27,7 +27,6 @@ const (
 )
 
 func GetNeuronScrapeConfig(hostinfo prometheusscraper.HostInfoProvider) *config.ScrapeConfig {
-
 	return &config.ScrapeConfig{
 		ScrapeProtocols: config.DefaultScrapeProtocols,
 		HTTPClientConfig: configutil.HTTPClientConfig{
@@ -60,12 +59,18 @@ func GetNeuronScrapeConfig(hostinfo prometheusscraper.HostInfoProvider) *config.
 }
 
 func GetNeuronMetricRelabelConfigs(hostinfo prometheusscraper.HostInfoProvider) []*relabel.Config {
-
 	return []*relabel.Config{
 		{
 			SourceLabels: model.LabelNames{"__name__"},
 			Regex:        relabel.MustNewRegexp("neuron.*|system_.*|execution_.*|hardware_ecc_.*"),
 			Action:       relabel.Keep,
+		},
+		{
+			SourceLabels: model.LabelNames{"ultraserver_id"},
+			TargetLabel:  "UltraServer",
+			Regex:        relabel.MustNewRegexp("(.*)"),
+			Replacement:  "${1}",
+			Action:       relabel.Replace,
 		},
 		{
 			SourceLabels: model.LabelNames{"neuroncore"},

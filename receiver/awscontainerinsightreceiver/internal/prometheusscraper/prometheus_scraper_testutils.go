@@ -6,6 +6,7 @@ package prometheusscraper // import "github.com/open-telemetry/opentelemetry-col
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,8 +43,9 @@ type TestSimplePrometheusEndToEndOpts struct {
 }
 
 type MockConsumer struct {
-	T               *testing.T
-	ExpectedMetrics map[string]ExpectedMetricStruct
+	T                *testing.T
+	ExpectedMetrics  map[string]ExpectedMetricStruct
+	AdditionalLabels []string
 }
 
 func (m MockConsumer) Capabilities() consumer.Capabilities {
@@ -68,6 +70,11 @@ func (m MockConsumer) ConsumeMetrics(_ context.Context, md pmetric.Metrics) erro
 				labelValue, isFound := metric.Gauge().DataPoints().At(0).Attributes().Get(expectedLabel.LabelName)
 				assert.True(m.T, isFound)
 				assert.Equal(m.T, expectedLabel.LabelValue, labelValue.Str())
+			}
+			for _, specialLabel := range m.AdditionalLabels {
+				isLabelInExpected := slices.ContainsFunc(metricsStruct.MetricLabels, func(label MetricLabel) bool { return label.LabelName == specialLabel })
+				_, isLabelInActual := metric.Gauge().DataPoints().At(0).Attributes().Get(specialLabel)
+				assert.Equal(m.T, isLabelInExpected, isLabelInActual)
 			}
 			metricFoundCount++
 		}
@@ -137,7 +144,7 @@ func TestSimplePrometheusEndToEnd(opts TestSimplePrometheusEndToEndOpts) {
 	params := receiver.Settings{
 		TelemetrySettings: scraper.Settings,
 	}
-	scraper.PrometheusReceiver, err = promFactory.CreateMetricsReceiver(scraper.Ctx, params, &promConfig, opts.Consumer)
+	scraper.PrometheusReceiver, err = promFactory.CreateMetrics(scraper.Ctx, params, &promConfig, opts.Consumer)
 	assert.NoError(opts.T, err)
 	assert.NotNil(opts.T, mp)
 	defer mp.Close()

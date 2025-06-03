@@ -108,12 +108,11 @@ func (p *PodResourcesStore) updateMaps() {
 	p.resourceToPodContainerMap = make(map[ResourceInfo]ContainerInfo)
 
 	if len(p.resourceNameSet) == 0 {
-		p.logger.Warn("No resource names allowlisted thus skipping updating of maps.")
+		p.logger.Debug("No resource names allowlisted thus skipping updating of maps.")
 		return
 	}
 
 	devicePods, err := p.podResourcesClient.ListPods()
-
 	if err != nil {
 		p.logger.Error(fmt.Sprintf("Error getting pod resources: %v", err))
 		return
@@ -122,7 +121,6 @@ func (p *PodResourcesStore) updateMaps() {
 	for _, pod := range devicePods.GetPodResources() {
 		for _, container := range pod.GetContainers() {
 			for _, device := range container.GetDevices() {
-
 				containerInfo := ContainerInfo{
 					PodName:       pod.GetName(),
 					Namespace:     pod.GetNamespace(),

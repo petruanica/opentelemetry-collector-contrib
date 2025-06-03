@@ -29,32 +29,31 @@ const (
 	caFile             = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	collectionInterval = 60 * time.Second
 	// needs to start with "containerInsightsKubeAPIServerScraper" for histogram deltas in the emf exporter
-	jobName = "containerInsightsKubeAPIServerScraper"
+	jobName                        = "containerInsightsKubeAPIServerScraper"
+	serviceAccountTokenDefaultPath = "/var/run/secrets/kubernetes.io/serviceaccount/token" // #nosec
 )
 
-var (
-	controlPlaneMetricAllowList = []string{
-		"^apiserver_admission_controller_admission_duration_seconds_(bucket|sum|count)$",
-		"^apiserver_admission_step_admission_duration_seconds_(bucket|sum|count)$",
-		"^apiserver_admission_webhook_admission_duration_seconds_(bucket|sum|count)$",
-		"^apiserver_current_inflight_requests$",
-		"^apiserver_current_inqueue_requests$",
-		"^apiserver_flowcontrol_rejected_requests_total$",
-		"^apiserver_flowcontrol_request_concurrency_limit$",
-		"^apiserver_longrunning_requests$",
-		"^apiserver_request_duration_seconds_(bucket|sum|count)$",
-		"^apiserver_request_total$",
-		"^apiserver_requested_deprecated_apis$",
-		"^apiserver_storage_list_duration_seconds_(bucket|sum|count)$",
-		"^apiserver_storage_objects$",
-		"^apiserver_storage_db_total_size_in_bytes$",
-		"^apiserver_storage_size_bytes$",
-		"^etcd_db_total_size_in_bytes$",
-		"^etcd_request_duration_seconds_(bucket|sum|count)$",
-		"^rest_client_request_duration_seconds_(bucket|sum|count)$",
-		"^rest_client_requests_total$",
-	}
-)
+var controlPlaneMetricAllowList = []string{
+	"^apiserver_admission_controller_admission_duration_seconds_(bucket|sum|count)$",
+	"^apiserver_admission_step_admission_duration_seconds_(bucket|sum|count)$",
+	"^apiserver_admission_webhook_admission_duration_seconds_(bucket|sum|count)$",
+	"^apiserver_current_inflight_requests$",
+	"^apiserver_current_inqueue_requests$",
+	"^apiserver_flowcontrol_rejected_requests_total$",
+	"^apiserver_flowcontrol_request_concurrency_limit$",
+	"^apiserver_longrunning_requests$",
+	"^apiserver_request_duration_seconds_(bucket|sum|count)$",
+	"^apiserver_request_total$",
+	"^apiserver_requested_deprecated_apis$",
+	"^apiserver_storage_list_duration_seconds_(bucket|sum|count)$",
+	"^apiserver_storage_objects$",
+	"^apiserver_storage_db_total_size_in_bytes$",
+	"^apiserver_storage_size_bytes$",
+	"^etcd_db_total_size_in_bytes$",
+	"^etcd_request_duration_seconds_(bucket|sum|count)$",
+	"^rest_client_request_duration_seconds_(bucket|sum|count)$",
+	"^rest_client_requests_total$",
+}
 
 type PrometheusScraper struct {
 	ctx                 context.Context
@@ -74,7 +73,6 @@ type PrometheusScraperOpts struct {
 	Host                component.Host
 	ClusterNameProvider clusterNameProvider
 	LeaderElection      *LeaderElection
-	BearerToken         string
 }
 
 func NewPrometheusScraper(opts PrometheusScraperOpts) (*PrometheusScraper, error) {
@@ -102,6 +100,10 @@ func NewPrometheusScraper(opts PrometheusScraperOpts) (*PrometheusScraper, error
 			TLSConfig: configutil.TLSConfig{
 				CAFile:             caFile,
 				InsecureSkipVerify: false,
+			},
+			Authorization: &configutil.Authorization{
+				Type:            "Bearer",
+				CredentialsFile: serviceAccountTokenDefaultPath,
 			},
 		},
 		ScrapeInterval:  model.Duration(collectionInterval),
@@ -147,12 +149,6 @@ func NewPrometheusScraper(opts PrometheusScraperOpts) (*PrometheusScraper, error
 		},
 	}
 
-	if opts.BearerToken != "" {
-		scrapeConfig.HTTPClientConfig.BearerToken = configutil.Secret(opts.BearerToken)
-	} else {
-		opts.TelemetrySettings.Logger.Warn("bearer token is not set, control plane metrics will not be published")
-	}
-
 	promConfig := prometheusreceiver.Config{
 		PrometheusConfig: &prometheusreceiver.PromConfig{
 			ScrapeConfigs: []*config.ScrapeConfig{scrapeConfig},
@@ -165,7 +161,7 @@ func NewPrometheusScraper(opts PrometheusScraperOpts) (*PrometheusScraper, error
 	}
 
 	promFactory := prometheusreceiver.NewFactory()
-	promReceiver, err := promFactory.CreateMetricsReceiver(opts.Ctx, params, &promConfig, opts.Consumer)
+	promReceiver, err := promFactory.CreateMetrics(opts.Ctx, params, &promConfig, opts.Consumer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create prometheus receiver: %w", err)
 	}
@@ -198,6 +194,7 @@ func (ps *PrometheusScraper) GetMetrics() []pmetric.Metrics {
 	}
 	return nil
 }
+
 func (ps *PrometheusScraper) Shutdown() {
 	if ps.running {
 		err := ps.prometheusReceiver.Shutdown(ps.ctx)

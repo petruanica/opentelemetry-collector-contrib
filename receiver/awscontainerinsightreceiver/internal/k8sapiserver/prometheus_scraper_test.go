@@ -101,7 +101,6 @@ func TestNewPrometheusScraperBadInputs(t *testing.T) {
 			Host:                componenttest.NewNopHost(),
 			ClusterNameProvider: mockClusterNameProvider{},
 			LeaderElection:      nil,
-			BearerToken:         "",
 		},
 		{
 			Ctx:                 context.TODO(),
@@ -111,7 +110,6 @@ func TestNewPrometheusScraperBadInputs(t *testing.T) {
 			Host:                componenttest.NewNopHost(),
 			ClusterNameProvider: mockClusterNameProvider{},
 			LeaderElection:      &leaderElection,
-			BearerToken:         "",
 		},
 		{
 			Ctx:                 context.TODO(),
@@ -121,7 +119,6 @@ func TestNewPrometheusScraperBadInputs(t *testing.T) {
 			Host:                nil,
 			ClusterNameProvider: mockClusterNameProvider{},
 			LeaderElection:      &leaderElection,
-			BearerToken:         "",
 		},
 		{
 			Ctx:                 context.TODO(),
@@ -131,7 +128,6 @@ func TestNewPrometheusScraperBadInputs(t *testing.T) {
 			Host:                componenttest.NewNopHost(),
 			ClusterNameProvider: nil,
 			LeaderElection:      &leaderElection,
-			BearerToken:         "",
 		},
 	}
 
@@ -142,8 +138,8 @@ func TestNewPrometheusScraperBadInputs(t *testing.T) {
 		assert.Nil(t, scraper)
 	}
 }
-func TestNewPrometheusScraperEndToEnd(t *testing.T) {
 
+func TestNewPrometheusScraperEndToEnd(t *testing.T) {
 	upPtr := false
 	httpPtr := false
 	relabeledPtr := false
@@ -172,7 +168,6 @@ func TestNewPrometheusScraperEndToEnd(t *testing.T) {
 		Host:                componenttest.NewNopHost(),
 		ClusterNameProvider: mockClusterNameProvider{},
 		LeaderElection:      &leaderElection,
-		BearerToken:         "",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, mockClusterNameProvider{}, scraper.clusterNameProvider)
@@ -252,7 +247,7 @@ func TestNewPrometheusScraperEndToEnd(t *testing.T) {
 	params := receiver.Settings{
 		TelemetrySettings: scraper.settings,
 	}
-	scraper.prometheusReceiver, err = promFactory.CreateMetricsReceiver(scraper.ctx, params, &promConfig, mConsumer)
+	scraper.prometheusReceiver, err = promFactory.CreateMetrics(scraper.ctx, params, &promConfig, mConsumer)
 	assert.NoError(t, err)
 	assert.NotNil(t, mp)
 	defer mp.Close()
