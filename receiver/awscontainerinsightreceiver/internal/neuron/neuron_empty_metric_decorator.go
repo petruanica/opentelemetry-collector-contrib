@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	statusType     		  = "status_type"
-	errorType      		  = "error_type"
-	memoryLocation 		  = "memory_location"
-	percentile     		  = "percentile"
-	RuntimeTagOverride 	= "DEFAULT"
+	statusType         = "status_type"
+	errorType          = "error_type"
+	memoryLocation     = "memory_location"
+	percentile         = "percentile"
+	RuntimeTagOverride = "DEFAULT"
 )
 
 var attributeConfig = map[string][]string{
@@ -129,6 +129,7 @@ func populateCoreMetrics(metrics pmetric.MetricSlice, metricName string, hardwar
 		datapoint.Attributes().PutStr(neuronCoreOriginalAttributeKey, strconv.Itoa(coreIndex))
 		datapoint.Attributes().PutStr(neuronDeviceAttributeKey, strconv.Itoa(coreIndex/neuronCoresPerDevice))
 		datapoint.Attributes().PutStr("runtime_tag", RuntimeTagOverride)
+		datapoint.Attributes().PutStr("runtime_tag", RuntimeTagOverride)
 	}
 
 	metricToAdd.CopyTo(metrics.AppendEmpty())
@@ -157,6 +158,7 @@ func createNewMetricFromHardwareInfo(hardwareInfo pmetric.Metric, metricName str
 	metricToAdd.SetName(metricName)
 	metricBody := metricToAdd.Gauge().DataPoints().At(0)
 	metricBody.SetDoubleValue(0)
+	metricBody.Attributes().PutStr("runtime_tag", RuntimeTagOverride)
 	metricBody.Attributes().PutStr("runtime_tag", RuntimeTagOverride)
 
 	return metricToAdd
