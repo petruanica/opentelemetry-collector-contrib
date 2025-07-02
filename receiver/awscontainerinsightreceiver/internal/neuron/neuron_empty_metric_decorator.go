@@ -19,6 +19,7 @@ const (
 	memoryLocation     = "memory_location"
 	percentile         = "percentile"
 	RuntimeTagOverride = "DEFAULT"
+	DefaultNeuronCorePerDevice = 2
 )
 
 var attributeConfig = map[string][]string{
@@ -66,6 +67,7 @@ func (ed *EmptyMetricDecorator) ConsumeMetrics(ctx context.Context, md pmetric.M
 			neuronHardwareInfo, neuronHardwareInfoFound := findNeuronHardwareInfo(metrics)
 			if neuronHardwareInfoFound {
 				ed.addEmptyMetrics(neuronHardwareInfo, metrics)
+				var neuronCoresPerDevice = DefaultNeuronCorePerDevice
 				neuronCoresPerDevice, foundCoresPerDevice := getNeuronCoresPerDevice(neuronHardwareInfo)
 				if foundCoresPerDevice {
 					ed.addNeuronCorePerDeviceAttribute(metrics, neuronCoresPerDevice)
