@@ -338,12 +338,14 @@ func TestConsumeMetricsForNeuronEmptyMetricsDecorator(t *testing.T) {
 					{
 						statusType:    "completed",
 						"runtime_tag": "123",
+						neuronCorePerDeviceKey:        "2",
 					},
 				},
 				{Name: NeuronExecutionErrors, MetricType: pmetric.MetricTypeGauge, DataValue: 1111}: {
 					{
 						errorType:     "generic",
 						"runtime_tag": "123",
+						neuronCorePerDeviceKey:        "2",
 					},
 				},
 				{Name: NeuronRuntimeMemoryUsage, MetricType: pmetric.MetricTypeGauge, DataValue: 0}: {
