@@ -67,10 +67,12 @@ func (ed *EmptyMetricDecorator) ConsumeMetrics(ctx context.Context, md pmetric.M
 			neuronHardwareInfo, neuronHardwareInfoFound := findNeuronHardwareInfo(metrics)
 			if neuronHardwareInfoFound {
 				ed.addEmptyMetrics(neuronHardwareInfo, metrics)
-				var neuronCoresPerDevice = DefaultNeuronCorePerDevice
 				neuronCoresPerDevice, foundCoresPerDevice := getNeuronCoresPerDevice(neuronHardwareInfo)
 				if foundCoresPerDevice {
 					ed.addNeuronCorePerDeviceAttribute(metrics, neuronCoresPerDevice)
+				} else {
+					// Always add the Default if the above is not found, should never happen
+					ed.addNeuronCorePerDeviceAttribute(metrics, DefaultNeuronCorePerDevice)
 				}
 			}
 		}
