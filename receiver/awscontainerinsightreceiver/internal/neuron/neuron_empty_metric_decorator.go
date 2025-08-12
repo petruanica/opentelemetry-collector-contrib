@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	statusType         = "status_type"
-	errorType          = "error_type"
-	memoryLocation     = "memory_location"
-	percentile         = "percentile"
-	RuntimeTagOverride = "DEFAULT"
+	statusType                 = "status_type"
+	errorType                  = "error_type"
+	memoryLocation             = "memory_location"
+	percentile                 = "percentile"
+	RuntimeTagOverride         = "DEFAULT"
 	DefaultNeuronCorePerDevice = 2
 )
 
