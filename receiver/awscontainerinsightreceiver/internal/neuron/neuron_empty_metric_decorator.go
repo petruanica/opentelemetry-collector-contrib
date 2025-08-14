@@ -191,7 +191,7 @@ func (ed *EmptyMetricDecorator) addNeuronCorePerDeviceAttribute(metrics pmetric.
 				dataPoints.At(j).Attributes().PutStr(neuronCorePerDeviceKey, attributeValue)
 			}
 		default:
-			ed.Logger.Info("Metric type not supported", zap.String("metricType", m.Type().String()))
+			ed.Logger.Warn("Metric type not supported", zap.String("metricType", m.Type().String()))
 		}
 	}
 }
