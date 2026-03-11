@@ -29,7 +29,7 @@ func createDefaultConfig() component.Config {
 	cfg := &Config{
 		ControllerConfig: scraperhelper.NewDefaultControllerConfig(),
 	}
-	cfg.ControllerConfig.CollectionInterval = 60 * time.Second
+	cfg.CollectionInterval = 60 * time.Second
 	return cfg
 }
 

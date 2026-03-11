@@ -4,7 +4,6 @@
 package awsekshyperpodreceiver
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ func TestFactory_CreateDefaultConfig(t *testing.T) {
 	rCfg, ok := cfg.(*Config)
 	require.True(t, ok, "expected *Config type from CreateDefaultConfig")
 
-	assert.Equal(t, 60*time.Second, rCfg.ControllerConfig.CollectionInterval)
+	assert.Equal(t, 60*time.Second, rCfg.CollectionInterval)
 	assert.Empty(t, rCfg.ClusterName)
 }
 
@@ -32,10 +31,10 @@ func TestFactory_CreateMetricsReceiver(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
 	cfg.ControllerConfig = scraperhelper.NewDefaultControllerConfig()
-	cfg.ControllerConfig.CollectionInterval = 60 * time.Second
+	cfg.CollectionInterval = 60 * time.Second
 
 	set := receivertest.NewNopSettings(metadata.Type)
-	receiver, err := factory.CreateMetrics(context.Background(), set, cfg, consumertest.NewNop())
+	receiver, err := factory.CreateMetrics(t.Context(), set, cfg, consumertest.NewNop())
 	require.NoError(t, err)
 	require.NotNil(t, receiver)
 }

@@ -17,7 +17,7 @@ func TestConfig_Validate_ValidConfig(t *testing.T) {
 		ControllerConfig: scraperhelper.NewDefaultControllerConfig(),
 		ClusterName:      "my-cluster",
 	}
-	cfg.ControllerConfig.CollectionInterval = 60 * time.Second
+	cfg.CollectionInterval = 60 * time.Second
 
 	require.NoError(t, cfg.Validate())
 }
@@ -26,7 +26,7 @@ func TestConfig_Validate_ZeroInterval(t *testing.T) {
 	cfg := &Config{
 		ControllerConfig: scraperhelper.NewDefaultControllerConfig(),
 	}
-	cfg.ControllerConfig.CollectionInterval = 0
+	cfg.CollectionInterval = 0
 
 	assert.Error(t, cfg.Validate())
 }
@@ -35,7 +35,7 @@ func TestConfig_Validate_NegativeInterval(t *testing.T) {
 	cfg := &Config{
 		ControllerConfig: scraperhelper.NewDefaultControllerConfig(),
 	}
-	cfg.ControllerConfig.CollectionInterval = -1 * time.Second
+	cfg.CollectionInterval = -1 * time.Second
 
 	assert.Error(t, cfg.Validate())
 }
@@ -44,7 +44,7 @@ func TestConfig_Validate_SmallPositiveInterval(t *testing.T) {
 	cfg := &Config{
 		ControllerConfig: scraperhelper.NewDefaultControllerConfig(),
 	}
-	cfg.ControllerConfig.CollectionInterval = 1 * time.Nanosecond
+	cfg.CollectionInterval = 1 * time.Nanosecond
 
 	require.NoError(t, cfg.Validate())
 }

@@ -4,14 +4,13 @@
 package awsekshyperpodreceiver
 
 import (
-	"context"
 	"strings"
 	"testing"
 
+	"pgregory.net/rapid"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/k8s/k8sclient"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/k8s/k8sutil"
-
-	"pgregory.net/rapid"
 )
 
 // --- Generators ---
@@ -61,6 +60,7 @@ func genClusterName() *rapid.Generator[string] {
 // **Validates: Requirements 3.1, 3.2**
 
 func TestProperty_MetricEmissionCorrectness(t *testing.T) {
+	ctx := t.Context()
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate 1-10 nodes, each with a valid health status.
 		nodeCount := rapid.IntRange(1, 10).Draw(t, "node_count")
@@ -93,7 +93,7 @@ func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 			nodeToLabelsMap: nodeToLabelsMap,
 		}
 
-		metrics, err := s.scrape(context.Background())
+		metrics, err := s.scrape(ctx)
 		if err != nil {
 			t.Fatalf("scrape returned error: %v", err)
 		}
@@ -131,11 +131,12 @@ func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 			onesCount := 0
 			zerosCount := 0
 			for _, e := range entries {
-				if e.value == 1 {
+				switch e.value {
+				case 1:
 					onesCount++
-				} else if e.value == 0 {
+				case 0:
 					zerosCount++
-				} else {
+				default:
 					t.Fatalf("node %s: unexpected metric value %d for %s", nodeName, e.value, e.name)
 				}
 			}
@@ -168,6 +169,7 @@ func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 // **Validates: Requirements 3.3, 5.2**
 
 func TestProperty_AttributeCorrectness(t *testing.T) {
+	ctx := t.Context()
 	rapid.Check(t, func(t *rapid.T) {
 		nodeName := genNodeName().Draw(t, "node_name")
 		status := genHealthStatus().Draw(t, "status")
@@ -186,7 +188,7 @@ func TestProperty_AttributeCorrectness(t *testing.T) {
 			},
 		}
 
-		metrics, err := s.scrape(context.Background())
+		metrics, err := s.scrape(ctx)
 		if err != nil {
 			t.Fatalf("scrape returned error: %v", err)
 		}
@@ -235,6 +237,7 @@ func TestProperty_AttributeCorrectness(t *testing.T) {
 // **Validates: Nodes with health label emit metrics regardless of instance type**
 
 func TestProperty_HealthLabelDeterminesEmission(t *testing.T) {
+	ctx := t.Context()
 	rapid.Check(t, func(t *rapid.T) {
 		nodeName := genNodeName().Draw(t, "node_name")
 		instanceType := genInstanceType().Draw(t, "instance_type")
@@ -259,7 +262,7 @@ func TestProperty_HealthLabelDeterminesEmission(t *testing.T) {
 			nodeToLabelsMap: nodeToLabelsMap,
 		}
 
-		metrics, err := s.scrape(context.Background())
+		metrics, err := s.scrape(ctx)
 		if err != nil {
 			t.Fatalf("scrape returned error: %v", err)
 		}

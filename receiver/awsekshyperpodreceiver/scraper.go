@@ -5,6 +5,7 @@ package awsekshyperpodreceiver // import "github.com/open-telemetry/opentelemetr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -50,7 +51,7 @@ func (s *scraper) start(_ context.Context, _ component.Host) error {
 
 	client := k8sclient.Get(s.logger, k8sclient.CaptureOnlyNodeLabelsInfo(true))
 	if client == nil {
-		return fmt.Errorf("failed to initialize K8s client")
+		return errors.New("failed to initialize K8s client")
 	}
 	s.k8sClient = client
 	s.nodeClient = client.GetNodeClient()
@@ -88,7 +89,7 @@ func (s *scraper) scrape(_ context.Context) (pmetric.Metrics, error) {
 	return metrics, nil
 }
 
-func (s *scraper) processNode(nodeName string, nodeInfo *k8sclient.NodeInfo, labelsMap map[k8sclient.Label]int8, sm pmetric.ScopeMetrics, timestamp pcommon.Timestamp) {
+func (s *scraper) processNode(nodeName string, _ *k8sclient.NodeInfo, labelsMap map[k8sclient.Label]int8, sm pmetric.ScopeMetrics, timestamp pcommon.Timestamp) {
 	// Get health status from labels map.
 	healthStatusInt, ok := labelsMap[k8sclient.SageMakerNodeHealthStatus]
 	if !ok {

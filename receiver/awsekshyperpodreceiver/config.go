@@ -4,7 +4,7 @@
 package awsekshyperpodreceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awsekshyperpodreceiver"
 
 import (
-	"fmt"
+	"errors"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/scraper/scraperhelper"
@@ -24,7 +24,7 @@ var _ component.Config = (*Config)(nil)
 // Validate checks that the configuration is valid.
 func (cfg *Config) Validate() error {
 	if cfg.CollectionInterval <= 0 {
-		return fmt.Errorf("collection_interval must be positive")
+		return errors.New("collection_interval must be positive")
 	}
 	return nil
 }

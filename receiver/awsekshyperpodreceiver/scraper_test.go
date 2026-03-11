@@ -4,7 +4,6 @@
 package awsekshyperpodreceiver
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -37,6 +36,7 @@ func (m *mockNodeClient) NodeToAllocatableMap() map[string]v1.ResourceList { ret
 func (m *mockNodeClient) NodeToConditionsMap() map[string]map[v1.NodeConditionType]v1.ConditionStatus {
 	return nil
 }
+
 func (m *mockNodeClient) NodeToLabelsMap() map[string]map[k8sclient.Label]int8 {
 	return m.nodeToLabelsMap
 }
@@ -102,7 +102,7 @@ func TestScrape_SchedulableStatus(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -132,7 +132,7 @@ func TestScrape_UnschedulableStatus(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -160,7 +160,7 @@ func TestScrape_UnschedulablePendingReplacementStatus(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -188,7 +188,7 @@ func TestScrape_UnschedulablePendingRebootStatus(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -217,7 +217,7 @@ func TestScrape_NodeWithoutHealthLabel(t *testing.T) {
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -237,7 +237,7 @@ func TestScrape_InvalidHealthStatus(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -257,7 +257,7 @@ func TestScrape_HyperPodPrefixRemoval(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -280,7 +280,7 @@ func TestScrape_NoPrefixNodeName(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -307,7 +307,7 @@ func TestScrape_ClusterNamePresent(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -334,7 +334,7 @@ func TestScrape_ClusterNameEmpty(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -354,7 +354,7 @@ func TestScrape_EmptyNodeList(t *testing.T) {
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
@@ -369,7 +369,7 @@ func TestShutdown_NilClient(t *testing.T) {
 	assert.Nil(t, s.k8sClient)
 
 	// Should not panic
-	err := s.shutdown(context.Background())
+	err := s.shutdown(t.Context())
 	assert.NoError(t, err)
 }
 
@@ -388,7 +388,7 @@ func TestScrape_MultipleNodes(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	// 2 nodes × 4 metrics each = 8 metrics
@@ -413,7 +413,7 @@ func TestScrape_MixedNodes(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	// Only node-valid should produce metrics (4 metrics)
@@ -436,7 +436,7 @@ func TestScrape_AttributesCorrectness(t *testing.T) {
 		},
 	}
 
-	metrics, err := s.scrape(context.Background())
+	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
