@@ -56,8 +56,6 @@ func genClusterName() *rapid.Generator[string] {
 }
 
 // --- Property 1: Metric emission correctness ---
-// Feature: hyperpod-otel-contrib-receiver, Property 1: Metric emission correctness
-// **Validates: Requirements 3.1, 3.2**
 
 func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 	ctx := t.Context()
@@ -165,8 +163,6 @@ func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 }
 
 // --- Property 2: Attribute correctness ---
-// Feature: hyperpod-otel-contrib-receiver, Property 2: Attribute correctness
-// **Validates: Requirements 3.3, 5.2**
 
 func TestProperty_AttributeCorrectness(t *testing.T) {
 	ctx := t.Context()
@@ -233,8 +229,6 @@ func TestProperty_AttributeCorrectness(t *testing.T) {
 }
 
 // --- Property 4: Any instance type with health label emits metrics ---
-// Feature: hyperpod-otel-contrib-receiver, Property 4: Health label presence determines emission
-// **Validates: Nodes with health label emit metrics regardless of instance type**
 
 func TestProperty_HealthLabelDeterminesEmission(t *testing.T) {
 	ctx := t.Context()

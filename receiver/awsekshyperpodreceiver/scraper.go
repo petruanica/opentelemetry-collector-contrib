@@ -6,7 +6,6 @@ package awsekshyperpodreceiver // import "github.com/open-telemetry/opentelemetr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -68,11 +67,9 @@ func (s *scraper) shutdown(_ context.Context) error {
 }
 
 func (s *scraper) scrape(_ context.Context) (pmetric.Metrics, error) {
-	nodeInfos := s.nodeClient.NodeInfos()
 	nodeToLabelsMap := s.nodeClient.NodeToLabelsMap()
 
 	s.logger.Debug("Collected nodes",
-		zap.Int("nodeInfos", len(nodeInfos)),
 		zap.Int("nodesWithLabels", len(nodeToLabelsMap)),
 	)
 
@@ -82,14 +79,13 @@ func (s *scraper) scrape(_ context.Context) (pmetric.Metrics, error) {
 
 	now := pcommon.NewTimestampFromTime(time.Now())
 	for nodeName, labelsMap := range nodeToLabelsMap {
-		nodeInfo := nodeInfos[nodeName]
-		s.processNode(nodeName, nodeInfo, labelsMap, sm, now)
+		s.processNode(nodeName, labelsMap, sm, now)
 	}
 
 	return metrics, nil
 }
 
-func (s *scraper) processNode(nodeName string, _ *k8sclient.NodeInfo, labelsMap map[k8sclient.Label]int8, sm pmetric.ScopeMetrics, timestamp pcommon.Timestamp) {
+func (s *scraper) processNode(nodeName string, labelsMap map[k8sclient.Label]int8, sm pmetric.ScopeMetrics, timestamp pcommon.Timestamp) {
 	// Get health status from labels map.
 	healthStatusInt, ok := labelsMap[k8sclient.SageMakerNodeHealthStatus]
 	if !ok {
@@ -129,7 +125,7 @@ func (s *scraper) emitHealthMetrics(sm pmetric.ScopeMetrics, nodeName, instanceI
 		metricName := statusToMetricName[statusStr]
 		metric := sm.Metrics().AppendEmpty()
 		metric.SetName(metricName)
-		metric.SetDescription(fmt.Sprintf("HyperPod node health status: %s", statusStr))
+		metric.SetDescription(statusToDescription[statusStr])
 		metric.SetUnit("1")
 
 		gauge := metric.SetEmptyGauge()
@@ -145,6 +141,14 @@ func (s *scraper) emitHealthMetrics(sm pmetric.ScopeMetrics, nodeName, instanceI
 			attrs.PutStr("cluster_name", s.config.ClusterName)
 		}
 	}
+}
+
+// statusToDescription maps each HyperPodConditionType string to its metric description.
+var statusToDescription = map[string]string{
+	k8sutil.Schedulable.String():                     "HyperPod node health status: Schedulable",
+	k8sutil.UnschedulablePendingReplacement.String(): "HyperPod node health status: UnschedulablePendingReplacement",
+	k8sutil.UnschedulablePendingReboot.String():      "HyperPod node health status: UnschedulablePendingReboot",
+	k8sutil.Unschedulable.String():                   "HyperPod node health status: Unschedulable",
 }
 
 // statusToMetricName maps each HyperPodConditionType string to its full metric name.
