@@ -97,28 +97,43 @@ func (s *scraper) scrape(_ context.Context) (pmetric.Metrics, error) {
 	rm := metrics.ResourceMetrics().AppendEmpty()
 	sm := rm.ScopeMetrics().AppendEmpty()
 
+	// Pre-create one Metric per status to avoid duplicate metric identities.
+	// Each metric will accumulate data points across all nodes.
+	gauges := make(map[string]pmetric.NumberDataPointSlice, len(allStatuses))
+	for _, status := range allStatuses {
+		statusStr := status.String()
+		metric := sm.Metrics().AppendEmpty()
+		metric.SetName(statusToMetricName[statusStr])
+		metric.SetDescription(statusToDescription[statusStr])
+		metric.SetUnit("1")
+		gauges[statusStr] = metric.SetEmptyGauge().DataPoints()
+	}
+
 	now := pcommon.NewTimestampFromTime(time.Now())
+	nodeCount := 0
 	for nodeName, labelsMap := range nodeToLabelsMap {
-		s.processNode(nodeName, labelsMap, sm, now)
+		if s.processNode(nodeName, labelsMap, gauges, now) {
+			nodeCount++
+		}
 	}
 
 	// If no nodes produced metrics (e.g., all had invalid/missing health labels),
 	// return empty metrics to avoid publishing empty ResourceMetrics/ScopeMetrics.
-	if sm.Metrics().Len() == 0 {
+	if nodeCount == 0 {
 		return pmetric.NewMetrics(), nil
 	}
 
 	return metrics, nil
 }
 
-func (s *scraper) processNode(nodeName string, labelsMap map[k8sclient.Label]int8, sm pmetric.ScopeMetrics, timestamp pcommon.Timestamp) {
+func (s *scraper) processNode(nodeName string, labelsMap map[k8sclient.Label]int8, gauges map[string]pmetric.NumberDataPointSlice, timestamp pcommon.Timestamp) bool {
 	// Get health status from labels map.
 	healthStatusInt, ok := labelsMap[k8sclient.SageMakerNodeHealthStatus]
 	if !ok {
 		s.logger.Debug("Node missing health status label",
 			zap.String("node", nodeName),
 		)
-		return
+		return false
 	}
 
 	// Validate health status value.
@@ -127,7 +142,7 @@ func (s *scraper) processNode(nodeName string, labelsMap map[k8sclient.Label]int
 			zap.String("node", nodeName),
 			zap.Int8("status", healthStatusInt),
 		)
-		return
+		return false
 	}
 
 	// Convert int8 to status string.
@@ -136,11 +151,12 @@ func (s *scraper) processNode(nodeName string, labelsMap map[k8sclient.Label]int
 	// Extract instance ID (remove hyperpod- prefix if present).
 	instanceID := strings.TrimPrefix(nodeName, hyperPodPrefix)
 
-	// Emit metrics for all statuses (1 for current, 0 for others).
-	s.emitHealthMetrics(sm, nodeName, instanceID, healthStatus, timestamp)
+	// Emit data points for all statuses (1 for current, 0 for others).
+	s.emitHealthMetrics(gauges, nodeName, instanceID, healthStatus, timestamp)
+	return true
 }
 
-func (s *scraper) emitHealthMetrics(sm pmetric.ScopeMetrics, nodeName, instanceID, currentStatus string, timestamp pcommon.Timestamp) {
+func (s *scraper) emitHealthMetrics(gauges map[string]pmetric.NumberDataPointSlice, nodeName, instanceID, currentStatus string, timestamp pcommon.Timestamp) {
 	for _, status := range allStatuses {
 		statusStr := status.String()
 		value := int64(0)
@@ -148,14 +164,7 @@ func (s *scraper) emitHealthMetrics(sm pmetric.ScopeMetrics, nodeName, instanceI
 			value = 1
 		}
 
-		metricName := statusToMetricName[statusStr]
-		metric := sm.Metrics().AppendEmpty()
-		metric.SetName(metricName)
-		metric.SetDescription(statusToDescription[statusStr])
-		metric.SetUnit("1")
-
-		gauge := metric.SetEmptyGauge()
-		dp := gauge.DataPoints().AppendEmpty()
+		dp := gauges[statusStr].AppendEmpty()
 		dp.SetTimestamp(timestamp)
 		dp.SetIntValue(value)
 

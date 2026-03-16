@@ -357,9 +357,13 @@ func TestScrape_MultipleNodes(t *testing.T) {
 	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
-	// 2 nodes × 4 metrics each = 8 metrics
+	// Always 4 metrics (one per status), each with 2 data points (one per node).
 	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
-	assert.Equal(t, 8, sm.Metrics().Len())
+	assert.Equal(t, 4, sm.Metrics().Len())
+	for i := 0; i < sm.Metrics().Len(); i++ {
+		assert.Equal(t, 2, sm.Metrics().At(i).Gauge().DataPoints().Len(),
+			"metric %s should have 2 data points", sm.Metrics().At(i).Name())
+	}
 }
 
 // --- Mixed nodes (valid, no label, invalid status) ---
@@ -484,13 +488,15 @@ func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 
 		sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
 
-		// Should emit exactly 4 metrics per node.
-		expectedMetricCount := len(nodeStatuses) * 4
-		if sm.Metrics().Len() != expectedMetricCount {
-			t.Fatalf("expected %d metrics, got %d", expectedMetricCount, sm.Metrics().Len())
+		// Should always emit exactly 4 metrics (one per status).
+		if sm.Metrics().Len() != 4 {
+			t.Fatalf("expected 4 metrics, got %d", sm.Metrics().Len())
 		}
 
-		// Group metrics by node_name.
+		// Each metric should have exactly len(nodeStatuses) data points.
+		expectedDPCount := len(nodeStatuses)
+
+		// Group data points by node_name across all metrics.
 		type metricEntry struct {
 			name  string
 			value int64
@@ -498,18 +504,24 @@ func TestProperty_MetricEmissionCorrectness(t *testing.T) {
 		nodeMetrics := make(map[string][]metricEntry)
 		for i := 0; i < sm.Metrics().Len(); i++ {
 			m := sm.Metrics().At(i)
-			dp := m.Gauge().DataPoints().At(0)
-			nodeName, _ := dp.Attributes().Get("node_name")
-			nodeMetrics[nodeName.Str()] = append(nodeMetrics[nodeName.Str()], metricEntry{
-				name:  m.Name(),
-				value: dp.IntValue(),
-			})
+			dps := m.Gauge().DataPoints()
+			if dps.Len() != expectedDPCount {
+				t.Fatalf("metric %s: expected %d data points, got %d", m.Name(), expectedDPCount, dps.Len())
+			}
+			for j := 0; j < dps.Len(); j++ {
+				dp := dps.At(j)
+				nodeName, _ := dp.Attributes().Get("node_name")
+				nodeMetrics[nodeName.Str()] = append(nodeMetrics[nodeName.Str()], metricEntry{
+					name:  m.Name(),
+					value: dp.IntValue(),
+				})
+			}
 		}
 
-		// Verify each node has exactly 4 metrics, exactly one = 1, rest = 0.
+		// Verify each node has exactly 4 entries (one per metric), exactly one = 1, rest = 0.
 		for nodeName, entries := range nodeMetrics {
 			if len(entries) != 4 {
-				t.Fatalf("node %s: expected 4 metrics, got %d", nodeName, len(entries))
+				t.Fatalf("node %s: expected 4 entries, got %d", nodeName, len(entries))
 			}
 
 			onesCount := 0
