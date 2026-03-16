@@ -28,6 +28,22 @@ var allStatuses = []k8sutil.HyperPodConditionType{
 	k8sutil.Unschedulable,
 }
 
+// statusToMetricName maps each HyperPodConditionType string to its full metric name.
+var statusToMetricName = map[string]string{
+	k8sutil.Schedulable.String():                     "hyperpod_node_health_status_schedulable",
+	k8sutil.UnschedulablePendingReplacement.String(): "hyperpod_node_health_status_unschedulable_pending_replacement",
+	k8sutil.UnschedulablePendingReboot.String():      "hyperpod_node_health_status_unschedulable_pending_reboot",
+	k8sutil.Unschedulable.String():                   "hyperpod_node_health_status_unschedulable",
+}
+
+// statusToDescription maps each HyperPodConditionType string to its metric description.
+var statusToDescription = map[string]string{
+	k8sutil.Schedulable.String():                     "HyperPod node health status: Schedulable",
+	k8sutil.UnschedulablePendingReplacement.String(): "HyperPod node health status: UnschedulablePendingReplacement",
+	k8sutil.UnschedulablePendingReboot.String():      "HyperPod node health status: UnschedulablePendingReboot",
+	k8sutil.Unschedulable.String():                   "HyperPod node health status: Unschedulable",
+}
+
 type scraper struct {
 	config     *Config
 	logger     *zap.Logger
@@ -151,22 +167,6 @@ func (s *scraper) emitHealthMetrics(sm pmetric.ScopeMetrics, nodeName, instanceI
 			attrs.PutStr("cluster_name", s.config.ClusterName)
 		}
 	}
-}
-
-// statusToDescription maps each HyperPodConditionType string to its metric description.
-var statusToDescription = map[string]string{
-	k8sutil.Schedulable.String():                     "HyperPod node health status: Schedulable",
-	k8sutil.UnschedulablePendingReplacement.String(): "HyperPod node health status: UnschedulablePendingReplacement",
-	k8sutil.UnschedulablePendingReboot.String():      "HyperPod node health status: UnschedulablePendingReboot",
-	k8sutil.Unschedulable.String():                   "HyperPod node health status: Unschedulable",
-}
-
-// statusToMetricName maps each HyperPodConditionType string to its full metric name.
-var statusToMetricName = map[string]string{
-	k8sutil.Schedulable.String():                     "hyperpod_node_health_status_schedulable",
-	k8sutil.UnschedulablePendingReplacement.String(): "hyperpod_node_health_status_unschedulable_pending_replacement",
-	k8sutil.UnschedulablePendingReboot.String():      "hyperpod_node_health_status_unschedulable_pending_reboot",
-	k8sutil.Unschedulable.String():                   "hyperpod_node_health_status_unschedulable",
 }
 
 func isValidHealthStatus(status int8) bool {
