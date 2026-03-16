@@ -4,6 +4,7 @@
 package awsekshyperpodreceiver
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"go.opentelemetry.io/collector/receiver/receivertest"
 	"go.opentelemetry.io/collector/scraper/scraperhelper"
 	v1 "k8s.io/api/core/v1"
+	"pgregory.net/rapid"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/k8s/k8sclient"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/k8s/k8sutil"
@@ -20,12 +22,11 @@ import (
 
 // mockNodeClient implements k8sclient.NodeClient for testing.
 type mockNodeClient struct {
-	nodeInfos       map[string]*k8sclient.NodeInfo
 	nodeToLabelsMap map[string]map[k8sclient.Label]int8
 }
 
 func (m *mockNodeClient) NodeInfos() map[string]*k8sclient.NodeInfo {
-	return m.nodeInfos
+	return nil
 }
 
 func (m *mockNodeClient) ClusterFailedNodeCount() int { return 0 }
@@ -94,9 +95,6 @@ func TestStatusToMetricName(t *testing.T) {
 func TestScrape_SchedulableStatus(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 		},
@@ -124,9 +122,6 @@ func TestScrape_SchedulableStatus(t *testing.T) {
 func TestScrape_UnschedulableStatus(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Unschedulable)},
 		},
@@ -152,9 +147,6 @@ func TestScrape_UnschedulableStatus(t *testing.T) {
 func TestScrape_UnschedulablePendingReplacementStatus(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.UnschedulablePendingReplacement)},
 		},
@@ -180,9 +172,6 @@ func TestScrape_UnschedulablePendingReplacementStatus(t *testing.T) {
 func TestScrape_UnschedulablePendingRebootStatus(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.UnschedulablePendingReboot)},
 		},
@@ -210,18 +199,15 @@ func TestScrape_UnschedulablePendingRebootStatus(t *testing.T) {
 func TestScrape_NodeWithoutHealthLabel(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
-		// node-1 is NOT in nodeToLabelsMap, so it should be skipped
+		// Empty nodeToLabelsMap — no nodes have labels.
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{},
 	}
 
 	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
-	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
-	assert.Equal(t, 0, sm.Metrics().Len())
+	// No nodes produce data, so no ResourceMetrics should be published.
+	assert.Equal(t, 0, metrics.ResourceMetrics().Len())
 }
 
 // --- Invalid health status values are skipped ---
@@ -229,9 +215,6 @@ func TestScrape_NodeWithoutHealthLabel(t *testing.T) {
 func TestScrape_InvalidHealthStatus(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(99)},
 		},
@@ -240,8 +223,8 @@ func TestScrape_InvalidHealthStatus(t *testing.T) {
 	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
-	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
-	assert.Equal(t, 0, sm.Metrics().Len(), "invalid health status should be skipped")
+	// Invalid health status produces no metrics, so no ResourceMetrics should be published.
+	assert.Equal(t, 0, metrics.ResourceMetrics().Len(), "invalid health status should be skipped")
 }
 
 // --- HyperPod prefix stripping tests ---
@@ -249,9 +232,6 @@ func TestScrape_InvalidHealthStatus(t *testing.T) {
 func TestScrape_HyperPodPrefixRemoval(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"hyperpod-i-1234567890abcdef0": {Name: "hyperpod-i-1234567890abcdef0", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"hyperpod-i-1234567890abcdef0": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 		},
@@ -272,9 +252,6 @@ func TestScrape_HyperPodPrefixRemoval(t *testing.T) {
 func TestScrape_NoPrefixNodeName(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"i-abcdef1234567890": {Name: "i-abcdef1234567890", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"i-abcdef1234567890": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 		},
@@ -299,9 +276,6 @@ func TestScrape_ClusterNamePresent(t *testing.T) {
 	cfg.ClusterName = "my-cluster"
 	s := newTestScraper(cfg)
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 		},
@@ -326,9 +300,6 @@ func TestScrape_ClusterNameEmpty(t *testing.T) {
 	cfg.ClusterName = ""
 	s := newTestScraper(cfg)
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-1": {Name: "node-1", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-1": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 		},
@@ -350,15 +321,14 @@ func TestScrape_ClusterNameEmpty(t *testing.T) {
 func TestScrape_EmptyNodeList(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos:       map[string]*k8sclient.NodeInfo{},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{},
 	}
 
 	metrics, err := s.scrape(t.Context())
 	require.NoError(t, err)
 
-	sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
-	assert.Equal(t, 0, sm.Metrics().Len())
+	// No nodes, so no ResourceMetrics should be published.
+	assert.Equal(t, 0, metrics.ResourceMetrics().Len())
 }
 
 // --- Shutdown with nil client ---
@@ -378,10 +348,6 @@ func TestShutdown_NilClient(t *testing.T) {
 func TestScrape_MultipleNodes(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"hyperpod-i-111": {Name: "hyperpod-i-111", InstanceType: "ml.p4d.24xlarge"},
-			"hyperpod-i-222": {Name: "hyperpod-i-222", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"hyperpod-i-111": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 			"hyperpod-i-222": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Unschedulable)},
@@ -401,11 +367,6 @@ func TestScrape_MultipleNodes(t *testing.T) {
 func TestScrape_MixedNodes(t *testing.T) {
 	s := newTestScraper(defaultTestConfig())
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"node-valid":          {Name: "node-valid", InstanceType: "ml.p4d.24xlarge"},
-			"node-no-label":       {Name: "node-no-label", InstanceType: "ml.p4d.24xlarge"},
-			"node-invalid-status": {Name: "node-invalid-status", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"node-valid":          {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 			"node-invalid-status": {k8sclient.SageMakerNodeHealthStatus: int8(99)},
@@ -428,9 +389,6 @@ func TestScrape_AttributesCorrectness(t *testing.T) {
 	cfg.ClusterName = "test-cluster"
 	s := newTestScraper(cfg)
 	s.nodeClient = &mockNodeClient{
-		nodeInfos: map[string]*k8sclient.NodeInfo{
-			"my-node": {Name: "my-node", InstanceType: "ml.p4d.24xlarge"},
-		},
 		nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
 			"my-node": {k8sclient.SageMakerNodeHealthStatus: int8(k8sutil.Schedulable)},
 		},
@@ -458,4 +416,244 @@ func TestScrape_AttributesCorrectness(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "test-cluster", clusterName.Str())
 	}
+}
+
+// --- Property-based test generators ---
+
+// genNodeName generates random node names, some with "hyperpod-" prefix, some without.
+func genNodeName() *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		base := rapid.StringMatching(`[a-z][a-z0-9\-]{2,20}`).Draw(t, "base")
+		if rapid.Bool().Draw(t, "has_prefix") {
+			return "hyperpod-" + base
+		}
+		return base
+	})
+}
+
+// genHealthStatus generates a valid health status int8 (0-3).
+func genHealthStatus() *rapid.Generator[int8] {
+	return rapid.Custom(func(t *rapid.T) int8 {
+		return int8(rapid.IntRange(0, 3).Draw(t, "status"))
+	})
+}
+
+// genClusterName generates empty and non-empty cluster names.
+func genClusterName() *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		if rapid.Bool().Draw(t, "has_cluster") {
+			return rapid.StringMatching(`[a-z][a-z0-9\-]{2,15}`).Draw(t, "cluster")
+		}
+		return ""
+	})
+}
+
+// --- Property 1: Metric emission correctness ---
+
+func TestProperty_MetricEmissionCorrectness(t *testing.T) {
+	ctx := t.Context()
+	rapid.Check(t, func(t *rapid.T) {
+		// Generate 1-10 nodes, each with a valid health status.
+		nodeCount := rapid.IntRange(1, 10).Draw(t, "node_count")
+
+		nodeToLabelsMap := make(map[string]map[k8sclient.Label]int8)
+		nodeStatuses := make(map[string]int8)
+
+		for i := 0; i < nodeCount; i++ {
+			name := genNodeName().Draw(t, "node_name")
+			// Ensure unique node names by appending index.
+			name = name + "-" + rapid.StringMatching(`[0-9]{4}`).Draw(t, "suffix")
+			status := genHealthStatus().Draw(t, "status")
+
+			nodeToLabelsMap[name] = map[k8sclient.Label]int8{
+				k8sclient.SageMakerNodeHealthStatus: status,
+			}
+			nodeStatuses[name] = status
+		}
+
+		cfg := defaultTestConfig()
+		s := newTestScraper(cfg)
+		s.nodeClient = &mockNodeClient{
+			nodeToLabelsMap: nodeToLabelsMap,
+		}
+
+		metrics, err := s.scrape(ctx)
+		if err != nil {
+			t.Fatalf("scrape returned error: %v", err)
+		}
+
+		sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
+
+		// Should emit exactly 4 metrics per node.
+		expectedMetricCount := len(nodeStatuses) * 4
+		if sm.Metrics().Len() != expectedMetricCount {
+			t.Fatalf("expected %d metrics, got %d", expectedMetricCount, sm.Metrics().Len())
+		}
+
+		// Group metrics by node_name.
+		type metricEntry struct {
+			name  string
+			value int64
+		}
+		nodeMetrics := make(map[string][]metricEntry)
+		for i := 0; i < sm.Metrics().Len(); i++ {
+			m := sm.Metrics().At(i)
+			dp := m.Gauge().DataPoints().At(0)
+			nodeName, _ := dp.Attributes().Get("node_name")
+			nodeMetrics[nodeName.Str()] = append(nodeMetrics[nodeName.Str()], metricEntry{
+				name:  m.Name(),
+				value: dp.IntValue(),
+			})
+		}
+
+		// Verify each node has exactly 4 metrics, exactly one = 1, rest = 0.
+		for nodeName, entries := range nodeMetrics {
+			if len(entries) != 4 {
+				t.Fatalf("node %s: expected 4 metrics, got %d", nodeName, len(entries))
+			}
+
+			onesCount := 0
+			zerosCount := 0
+			for _, e := range entries {
+				switch e.value {
+				case 1:
+					onesCount++
+				case 0:
+					zerosCount++
+				default:
+					t.Fatalf("node %s: unexpected metric value %d for %s", nodeName, e.value, e.name)
+				}
+			}
+			if onesCount != 1 {
+				t.Fatalf("node %s: expected exactly 1 metric with value 1, got %d", nodeName, onesCount)
+			}
+			if zerosCount != 3 {
+				t.Fatalf("node %s: expected exactly 3 metrics with value 0, got %d", nodeName, zerosCount)
+			}
+
+			// Verify the metric set to 1 matches the node's status.
+			expectedStatus := k8sutil.HyperPodConditionType(nodeStatuses[nodeName]).String()
+			expectedMetricName := statusToMetricName[expectedStatus]
+			found := false
+			for _, e := range entries {
+				if e.value == 1 && e.name == expectedMetricName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("node %s: expected metric %s to be 1, but it wasn't", nodeName, expectedMetricName)
+			}
+		}
+	})
+}
+
+// --- Property 2: Attribute correctness ---
+
+func TestProperty_AttributeCorrectness(t *testing.T) {
+	ctx := t.Context()
+	rapid.Check(t, func(t *rapid.T) {
+		nodeName := genNodeName().Draw(t, "node_name")
+		status := genHealthStatus().Draw(t, "status")
+		clusterName := genClusterName().Draw(t, "cluster_name")
+
+		cfg := defaultTestConfig()
+		cfg.ClusterName = clusterName
+		s := newTestScraper(cfg)
+		s.nodeClient = &mockNodeClient{
+			nodeToLabelsMap: map[string]map[k8sclient.Label]int8{
+				nodeName: {k8sclient.SageMakerNodeHealthStatus: status},
+			},
+		}
+
+		metrics, err := s.scrape(ctx)
+		if err != nil {
+			t.Fatalf("scrape returned error: %v", err)
+		}
+
+		sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
+		if sm.Metrics().Len() != 4 {
+			t.Fatalf("expected 4 metrics, got %d", sm.Metrics().Len())
+		}
+
+		// Expected instance_id: strip "hyperpod-" prefix if present.
+		expectedInstanceID := strings.TrimPrefix(nodeName, "hyperpod-")
+
+		for i := 0; i < sm.Metrics().Len(); i++ {
+			dp := sm.Metrics().At(i).Gauge().DataPoints().At(0)
+			attrs := dp.Attributes()
+
+			// Verify node_name.
+			nn, ok := attrs.Get("node_name")
+			if !ok || nn.Str() != nodeName {
+				t.Fatalf("expected node_name=%q, got %q (ok=%v)", nodeName, nn.Str(), ok)
+			}
+
+			// Verify instance_id.
+			iid, ok := attrs.Get("instance_id")
+			if !ok || iid.Str() != expectedInstanceID {
+				t.Fatalf("expected instance_id=%q, got %q (ok=%v)", expectedInstanceID, iid.Str(), ok)
+			}
+
+			// Verify cluster_name presence/absence.
+			cn, hasCN := attrs.Get("cluster_name")
+			if clusterName != "" {
+				if !hasCN || cn.Str() != clusterName {
+					t.Fatalf("expected cluster_name=%q, got %q (present=%v)", clusterName, cn.Str(), hasCN)
+				}
+			} else {
+				if hasCN {
+					t.Fatalf("expected cluster_name to be absent when config is empty, but got %q", cn.Str())
+				}
+			}
+		}
+	})
+}
+
+// --- Property 3: Any instance type with health label emits metrics ---
+
+func TestProperty_HealthLabelDeterminesEmission(t *testing.T) {
+	ctx := t.Context()
+	rapid.Check(t, func(t *rapid.T) {
+		nodeName := genNodeName().Draw(t, "node_name")
+		hasHealthLabel := rapid.Bool().Draw(t, "has_health_label")
+		status := genHealthStatus().Draw(t, "status")
+
+		cfg := defaultTestConfig()
+		s := newTestScraper(cfg)
+
+		nodeToLabelsMap := make(map[string]map[k8sclient.Label]int8)
+		if hasHealthLabel {
+			nodeToLabelsMap[nodeName] = map[k8sclient.Label]int8{
+				k8sclient.SageMakerNodeHealthStatus: status,
+			}
+		}
+
+		s.nodeClient = &mockNodeClient{
+			nodeToLabelsMap: nodeToLabelsMap,
+		}
+
+		metrics, err := s.scrape(ctx)
+		if err != nil {
+			t.Fatalf("scrape returned error: %v", err)
+		}
+
+		hasResourceMetrics := metrics.ResourceMetrics().Len() > 0
+
+		// Metrics emitted iff node has a valid health status label.
+		shouldEmit := hasHealthLabel
+
+		if hasResourceMetrics != shouldEmit {
+			t.Fatalf("node=%q hasLabel=%v: expected emit=%v, got emit=%v",
+				nodeName, hasHealthLabel, shouldEmit, hasResourceMetrics)
+		}
+
+		// If metrics were emitted, verify count is exactly 4.
+		if hasResourceMetrics {
+			sm := metrics.ResourceMetrics().At(0).ScopeMetrics().At(0)
+			if sm.Metrics().Len() != 4 {
+				t.Fatalf("expected 4 metrics when emitting, got %d", sm.Metrics().Len())
+			}
+		}
+	})
 }

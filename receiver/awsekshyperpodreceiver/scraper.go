@@ -73,6 +73,10 @@ func (s *scraper) scrape(_ context.Context) (pmetric.Metrics, error) {
 		zap.Int("nodesWithLabels", len(nodeToLabelsMap)),
 	)
 
+	if len(nodeToLabelsMap) == 0 {
+		return pmetric.NewMetrics(), nil
+	}
+
 	metrics := pmetric.NewMetrics()
 	rm := metrics.ResourceMetrics().AppendEmpty()
 	sm := rm.ScopeMetrics().AppendEmpty()
@@ -80,6 +84,12 @@ func (s *scraper) scrape(_ context.Context) (pmetric.Metrics, error) {
 	now := pcommon.NewTimestampFromTime(time.Now())
 	for nodeName, labelsMap := range nodeToLabelsMap {
 		s.processNode(nodeName, labelsMap, sm, now)
+	}
+
+	// If no nodes produced metrics (e.g., all had invalid/missing health labels),
+	// return empty metrics to avoid publishing empty ResourceMetrics/ScopeMetrics.
+	if sm.Metrics().Len() == 0 {
+		return pmetric.NewMetrics(), nil
 	}
 
 	return metrics, nil
